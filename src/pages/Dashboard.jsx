@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { HandCoins, Clock3, PlusCircle } from 'lucide-react'
+import { Users, HandCoins, Clock3, PlusCircle } from 'lucide-react'
 import Topbar from '../components/Topbar'
 import StatCard from '../components/StatCard'
 import OverduePayments from '../components/OverduePayments'
@@ -32,13 +32,17 @@ export default function Dashboard() {
     load()
   }, [])
 
-  const { collectedThisMonth, pendingTotal, overdueTotal, overdueList, chartData } = useMemo(() => {
+  const { totalCollected, totalClients, pendingTotal, overdueTotal, overdueList, chartData } = useMemo(() => {
     const now = new Date()
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
 
-    const collectedThisMonth = payments
-      .filter((p) => p.status === 'paid' && p.paid_at && new Date(p.paid_at) >= startOfMonth)
+    // All-time total collected across every client and program — not
+    // scoped to any date range, since this card is meant to represent the
+    // program's total, not a single month's slice of it.
+    const totalCollected = payments
+      .filter((p) => p.status === 'paid')
       .reduce((sum, p) => sum + Number(p.amount), 0)
+
+    const totalClients = clients.length
 
     const priceByProgram = new Map(programs.map((p) => [p.id, Number(p.price)]))
     const dateByProgram = new Map(programs.map((p) => [p.id, p.date ? new Date(p.date) : null]))
@@ -127,7 +131,7 @@ export default function Dashboard() {
     })
     const chartData = allDailyPoints.slice(-8)
 
-    return { collectedThisMonth, pendingTotal, overdueTotal, overdueList, chartData }
+    return { totalCollected, totalClients, pendingTotal, overdueTotal, overdueList, chartData }
   }, [payments, programs, clients])
 
   const user = admin && {
@@ -145,11 +149,12 @@ export default function Dashboard() {
       />
 
       <div className="p-4 sm:p-8">
-        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard icon={Users} label="Total clients" value={totalClients.toLocaleString()} />
           <StatCard
             icon={HandCoins}
             label="Payment collected"
-            value={`GHS ${collectedThisMonth.toLocaleString()}`}
+            value={`GHS ${totalCollected.toLocaleString()}`}
           />
           <StatCard
             icon={Clock3}

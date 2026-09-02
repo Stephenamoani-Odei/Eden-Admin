@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate, useLocation, Navigate } from 'react-router-dom'
 import { Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
@@ -13,17 +13,6 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const [progress, setProgress] = useState(0)
-
-
-  useEffect(() => {
-    if (!submitting) return
-    setProgress(8)
-    const interval = setInterval(() => {
-      setProgress((p) => (p >= 90 ? p : p + (90 - p) * 0.15))
-    }, 150)
-    return () => clearInterval(interval)
-  }, [submitting])
 
   if (!loading && session) {
     const from = location.state?.from?.pathname || '/'
@@ -37,17 +26,13 @@ export default function Login() {
 
     const { error } = await signIn(username, password)
 
+    setSubmitting(false)
     if (error) {
       console.error('Login error:', error)
-      setSubmitting(false)
-      setProgress(0)
       setError(error.message || 'Incorrect username or password. Try again.')
       return
     }
-
-    setProgress(100)
-    // Brief pause so the bar visibly reaches full before navigating away.
-    setTimeout(() => navigate('/'), 250)
+    navigate('/')
   }
 
   return (
@@ -110,18 +95,6 @@ export default function Login() {
           </div>
 
           {error && <p className="text-sm text-danger-600">{error}</p>}
-
-          {submitting && (
-            <div>
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-                <div
-                  className="h-full rounded-full bg-brand-600 transition-all duration-150 ease-out"
-                  style={{ width: `${Math.round(progress)}%` }}
-                />
-              </div>
-              <p className="mt-1 text-right text-xs text-slate-400">{Math.round(progress)}%</p>
-            </div>
-          )}
 
           <button
             type="submit"

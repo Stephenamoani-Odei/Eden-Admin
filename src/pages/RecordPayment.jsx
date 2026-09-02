@@ -3,17 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
-import { useToast } from '../lib/ToastContext'
-
-// Normalizes to the same local "0XXXXXXXXX" format the rest of the system
-// stores, regardless of how the admin typed it in (with/without country
-// code, spaces, dashes, etc.) — this is what lets us reliably match a
-// returning client by phone even if their name is typed differently.
-function normalizePhone(phone) {
-  const digits = (phone || '').replace(/\D/g, '')
-  if (digits.startsWith('233')) return '0' + digits.slice(3)
-  return digits
-}
 
 const GHANA_REGIONS = [
   'Ahafo',
@@ -36,7 +25,6 @@ const GHANA_REGIONS = [
 
 export default function RecordPayment() {
   const { admin } = useAuth()
-  const { showToast } = useToast()
   const navigate = useNavigate()
 
   const [clients, setClients] = useState([])
@@ -63,30 +51,6 @@ export default function RecordPayment() {
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [phoneMatch, setPhoneMatch] = useState(null) // { id, name } if an existing client shares this phone
-
-  // Live check as the admin types a phone number in "Add new client" mode —
-  // warns before submit, rather than only catching it at save time.
-  useEffect(() => {
-    if (!newClientMode) {
-      setPhoneMatch(null)
-      return
-    }
-    const normalized = normalizePhone(form.newClientPhone)
-    if (normalized.length < 9) {
-      setPhoneMatch(null)
-      return
-    }
-    const timeout = setTimeout(async () => {
-      const { data } = await supabase
-        .from('clients')
-        .select('id, name')
-        .eq('phone', normalized)
-        .maybeSingle()
-      setPhoneMatch(data || null)
-    }, 400)
-    return () => clearTimeout(timeout)
-  }, [form.newClientPhone, newClientMode])
 
   useEffect(() => {
     async function load() {
@@ -188,45 +152,25 @@ export default function RecordPayment() {
     let clientId = form.clientId
 
     if (newClientMode) {
-      const normalizedPhone = normalizePhone(form.newClientPhone)
+      const { data, error } = await supabase
+        .from('clients')
+        .insert({
+          name: form.newClientName,
+          phone: form.newClientPhone || null,
+          email: form.newClientEmail || null,
+          region: form.newClientRegion || null,
+          city: form.newClientCity || null,
+          added_by: admin?.id,
+        })
+        .select('id')
+        .single()
 
-      // Same phone number = same person, regardless of how their name was
-      // typed this time. Reuse their existing record instead of creating a
-      // duplicate client the payment history would then be split across.
-      if (normalizedPhone) {
-        const { data: existing } = await supabase
-          .from('clients')
-          .select('id, name')
-          .eq('phone', normalizedPhone)
-          .maybeSingle()
-
-        if (existing) {
-          clientId = existing.id
-          showToast(`Matched an existing client by phone number (${existing.name}) — adding this payment to their record instead of creating a duplicate.`)
-        }
+      if (error) {
+        setSaving(false)
+        setError(error.message)
+        return
       }
-
-      if (!clientId) {
-        const { data, error } = await supabase
-          .from('clients')
-          .insert({
-            name: form.newClientName,
-            phone: normalizedPhone || null,
-            email: form.newClientEmail || null,
-            region: form.newClientRegion || null,
-            city: form.newClientCity || null,
-            added_by: admin?.id,
-          })
-          .select('id')
-          .single()
-
-        if (error) {
-          setSaving(false)
-          setError(error.message)
-          return
-        }
-        clientId = data.id
-      }
+      clientId = data.id
     }
 
     if (!clientId) {
@@ -319,22 +263,6 @@ export default function RecordPayment() {
                   placeholder="Phone (optional)"
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                 />
-                {phoneMatch && (
-                  <div className="flex items-center justify-between gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                    <span>A client named <strong>{phoneMatch.name}</strong> already has this phone number.</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setNewClientMode(false)
-                        setForm((f) => ({ ...f, clientId: phoneMatch.id }))
-                        setPhoneMatch(null)
-                      }}
-                      className="shrink-0 rounded-md bg-amber-100 px-2 py-1 font-medium hover:bg-amber-200"
-                    >
-                      Use their record
-                    </button>
-                  </div>
-                )}
                 <input
                   type="email"
                   value={form.newClientEmail}

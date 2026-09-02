@@ -19,12 +19,7 @@ export default function Approvals() {
       .select('id, amount, transaction_id, created_at, clients(name, phone), programs(name)')
       .eq('status', 'awaiting_approval')
       .order('created_at', { ascending: true })
-    if (error) {
-      console.error('Approvals load error:', error)
-      showToast(`Couldn't load approvals: ${error.message}`, 'error')
-    } else {
-      setRows(data)
-    }
+    if (!error) setRows(data)
     setLoading(false)
   }
 
@@ -66,15 +61,6 @@ export default function Approvals() {
       <PageHeader
         title="Approvals"
         subtitle="Transactions clients say they've made, waiting on your confirmation"
-        action={
-          <button
-            onClick={load}
-            disabled={loading}
-            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-white disabled:opacity-50"
-          >
-            {loading ? 'Refreshing…' : 'Refresh'}
-          </button>
-        }
       />
 
       <div className="p-4 sm:p-8">

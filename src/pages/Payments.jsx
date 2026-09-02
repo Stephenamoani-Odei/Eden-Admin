@@ -30,12 +30,7 @@ export default function Payments() {
     if (filter !== 'all') query = query.eq('status', filter)
 
     const { data, error } = await query
-    if (error) {
-      console.error('Payments load error:', error)
-      showToast(`Couldn't load payments: ${error.message}`, 'error')
-    } else {
-      setPayments(data)
-    }
+    if (!error) setPayments(data)
     setLoading(false)
   }
 
@@ -88,36 +83,27 @@ export default function Payments() {
 
     showToast(`Calling send-approval-sms for ${clientPhone}…`)
 
-    try {
-      const { data: smsData, error: smsError } = await supabase.functions.invoke('send-approval-sms', {
-        body: {
-          clientId,
-          clientName,
-          clientPhone,
-          ticketNumber,
-          programName,
-          amountPaid,
-          remainingBalance,
-          isFull,
-        },
-      })
+    const { data: smsData, error: smsError } = await supabase.functions.invoke('send-approval-sms', {
+      body: {
+        clientId,
+        clientName,
+        clientPhone,
+        ticketNumber,
+        programName,
+        amountPaid,
+        remainingBalance,
+        isFull,
+      },
+    })
 
-      console.log('send-approval-sms response:', { smsData, smsError })
+    console.log('send-approval-sms response:', { smsData, smsError })
 
-      if (smsError) {
-        showToast(`SMS call failed: ${smsError.message}`, 'error')
-      } else if (smsData?.error) {
-        showToast(`SMS failed: ${JSON.stringify(smsData)}`, 'error')
-      } else {
-        showToast(`SMS sent to ${smsData?.sentTo ?? clientPhone}.`)
-      }
-    } catch (thrown) {
-      // Without this catch, a thrown error here (CORS block, network
-      // failure, request never leaving the browser) fails completely
-      // silently — no toast, no console line, no entry in the function's
-      // Invocations tab. This is almost certainly what was happening.
-      console.error('send-approval-sms threw before reaching the server:', thrown)
-      showToast(`SMS request never reached the server: ${thrown?.message || thrown}`, 'error')
+    if (smsError) {
+      showToast(`SMS call failed: ${smsError.message}`, 'error')
+    } else if (smsData?.error) {
+      showToast(`SMS failed: ${JSON.stringify(smsData)}`, 'error')
+    } else {
+      showToast(`SMS sent to ${smsData?.sentTo ?? clientPhone}.`)
     }
 
     setActingOn(null)
