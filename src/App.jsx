@@ -12,6 +12,8 @@ import Admins from './pages/Admins'
 import AuditLog from './pages/AuditLog'
 import Settings from './pages/Settings'
 
+const SYSTEM_UPDATE_IN_PROGRESS = true
+
 function AppLayout({ children }) {
   return (
     <div className="flex h-screen bg-slate-50">
@@ -29,7 +31,27 @@ function withLayout(page) {
   )
 }
 
+function SystemUpdateDialog() {
+  return (
+    <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-slate-50 px-4 text-center">
+      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+        <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+        </svg>
+      </div>
+      <p className="text-lg font-semibold text-slate-800">System update in progress</p>
+      <p className="max-w-sm text-sm text-slate-500">
+        We're working on the dashboard right now. Please check back later.
+      </p>
+    </div>
+  )
+}
+
 export default function App() {
+  if (SYSTEM_UPDATE_IN_PROGRESS) {
+    return <SystemUpdateDialog />
+  }
+
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
