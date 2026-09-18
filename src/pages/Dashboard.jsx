@@ -19,6 +19,14 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function load() {
+      // Fallback sweep: the real automatic archiving runs on a daily
+      // Supabase cron job (see migrations/add_program_history.sql). This
+      // call is just a safety net so archiving still happens even if that
+      // job isn't set up yet — it's a no-op when nothing is due.
+      supabase.rpc('archive_completed_programs').then(({ error }) => {
+        if (error) console.error('Archive sweep failed:', error.message)
+      })
+
       const [{ data: allPayments }, { data: programRows }, { data: clientRows }] = await Promise.all([
         supabase.from('payments').select('client_id, program_id, amount, status, due_date, paid_at'),
         supabase.from('programs').select('id, price, date'),

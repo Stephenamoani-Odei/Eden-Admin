@@ -12,6 +12,7 @@ import {
   FileClock,
   Inbox,
   Settings,
+  Archive,
   LogOut,
   Menu,
   X,
@@ -24,6 +25,7 @@ const mainLinks = [
   { to: '/approvals', label: 'Approvals', icon: Inbox },
   { to: '/reports', label: 'Report and stat', icon: ClipboardList },
   { to: '/payments/record', label: 'Record payment', icon: HandCoins },
+  { to: '/history', label: 'History', icon: Archive },
 ]
 
 const quickActions = [

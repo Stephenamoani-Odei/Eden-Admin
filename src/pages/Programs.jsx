@@ -16,6 +16,8 @@ export default function Programs() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [pendingDelete, setPendingDelete] = useState(null)
+  const [pendingMarkDone, setPendingMarkDone] = useState(null)
+  const [markingDone, setMarkingDone] = useState(false)
 
   async function loadPrograms() {
     setLoading(true)
@@ -58,17 +60,42 @@ export default function Programs() {
   }
 
   async function toggleActive(program) {
+    // Marking a program done now archives it immediately — its name, date,
+    // client count, and total collected move to History, and its client +
+    // payment records are removed. That's irreversible, so it goes through
+    // a confirmation step instead of a plain toggle.
+    if (program.is_active) {
+      setPendingMarkDone(program)
+      return
+    }
+    // Re-activating an already-inactive program (rare — only reachable if
+    // toggled off without archiving elsewhere) stays a simple flag flip.
     setPrograms((prev) =>
-      prev.map((p) => (p.id === program.id ? { ...p, is_active: !program.is_active } : p))
+      prev.map((p) => (p.id === program.id ? { ...p, is_active: true } : p))
     )
-    const { error } = await supabase
-      .from('programs')
-      .update({ is_active: !program.is_active })
-      .eq('id', program.id)
+    const { error } = await supabase.from('programs').update({ is_active: true }).eq('id', program.id)
     if (error) {
       showToast(error.message, 'error')
       loadPrograms()
     }
+  }
+
+  async function confirmMarkDone() {
+    const program = pendingMarkDone
+    if (!program) return
+    setMarkingDone(true)
+
+    const { error } = await supabase.rpc('admin_mark_program_done', { p_program_id: program.id })
+
+    setMarkingDone(false)
+    setPendingMarkDone(null)
+
+    if (error) {
+      showToast(error.message, 'error')
+      return
+    }
+    setPrograms((prev) => prev.filter((p) => p.id !== program.id))
+    showToast(`"${program.name}" was archived to History.`)
   }
 
   async function confirmDelete() {
@@ -296,6 +323,19 @@ export default function Programs() {
         }
         onConfirm={confirmDelete}
         onCancel={() => setPendingDelete(null)}
+      />
+
+      <ConfirmDialog
+        open={!!pendingMarkDone}
+        title="Mark this program as done?"
+        message={
+          pendingMarkDone
+            ? `"${pendingMarkDone.name}" will move to History right now — its name, date, client count, and total collected are kept there permanently. Its client details and payment records will be deleted. This can't be undone.`
+            : ''
+        }
+        confirmLabel={markingDone ? 'Archiving…' : 'Mark as done'}
+        onConfirm={confirmMarkDone}
+        onCancel={() => setPendingMarkDone(null)}
       />
     </div>
   )
