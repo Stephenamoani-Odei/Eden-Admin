@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Archive, Download } from 'lucide-react'
+import { Archive, Download, X } from 'lucide-react'
 import PageHeader from '../components/PageHeader'
 import StatCard from '../components/StatCard'
 import { supabase } from '../lib/supabase'
@@ -10,6 +10,9 @@ export default function History() {
   const [records, setRecords] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [selected, setSelected] = useState(null)
+  const [selectedClients, setSelectedClients] = useState([])
+  const [selectedLoading, setSelectedLoading] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -27,6 +30,45 @@ export default function History() {
     }
     load()
   }, [])
+
+  useEffect(() => {
+    if (!selected) {
+      setSelectedClients([])
+      return
+    }
+    async function loadClients() {
+      setSelectedLoading(true)
+      const { data, error } = await supabase
+        .from('program_history_clients')
+        .select('*')
+        .eq('history_id', selected.id)
+        .order('client_name')
+
+      if (!error) setSelectedClients(data || [])
+      setSelectedLoading(false)
+    }
+    loadClients()
+  }, [selected])
+
+  function handleDownloadSelectedClients() {
+    if (!selected) return
+    const slug = selected.program_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+    downloadCsv(
+      `edenplus-${slug || 'program'}-clients.csv`,
+      selectedClients.length > 0
+        ? selectedClients.map((c) => ({
+            'Client name': c.client_name || '—',
+            Phone: c.phone || '',
+            Email: c.email || '',
+            Region: c.region || '',
+            'Town/City': c.city || '',
+            Ticket: c.ticket_number || '',
+            'Paid (GHS)': c.paid_amount,
+            'Pending (GHS)': c.pending_amount,
+          }))
+        : [{ 'Client name': 'No clients registered for this program' }]
+    )
+  }
 
   const totalClients = records.reduce((sum, r) => sum + (r.total_clients || 0), 0)
   const totalAmount = records.reduce((sum, r) => sum + Number(r.total_amount || 0), 0)
@@ -48,7 +90,7 @@ export default function History() {
     <div className="flex-1 overflow-y-auto bg-slate-50">
       <PageHeader
         title="History"
-        subtitle="Programs that finished, 7+ days ago, and were auto-archived"
+        subtitle="Programs that have finished — archived automatically after 7 days, or manually"
         action={
           records.length > 0 && (
             <button
@@ -79,9 +121,9 @@ export default function History() {
           </div>
         ) : records.length === 0 ? (
           <div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500 shadow-sm">
-            Nothing archived yet. Programs move here automatically 7 days after their date —
-            client and payment details are removed at that point, but the program's name, date,
-            client count, and total collected stay here permanently.
+            Nothing archived yet. Programs move here automatically 7 days after their date, or
+            immediately if you mark one done manually. Client details move with them — nothing
+            is deleted, it just becomes read-only history.
           </div>
         ) : (
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -98,7 +140,11 @@ export default function History() {
                 </thead>
                 <tbody>
                   {records.map((r) => (
-                    <tr key={r.id} className="border-b border-slate-50 last:border-0">
+                    <tr
+                      key={r.id}
+                      onClick={() => setSelected(r)}
+                      className="cursor-pointer border-b border-slate-50 last:border-0 hover:bg-slate-50"
+                    >
                       <td className="px-6 py-3 font-medium text-slate-800">{r.program_name}</td>
                       <td className="px-6 py-3 text-slate-600">
                         {r.program_date ? new Date(r.program_date).toLocaleDateString() : '—'}
@@ -118,6 +164,112 @@ export default function History() {
           </div>
         )}
       </div>
+
+      {selected && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+          onClick={() => setSelected(null)}
+        >
+          <div
+            className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-6 shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-5 flex items-start justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">{selected.program_name}</h2>
+                <p className="text-sm text-slate-500">
+                  Ran on{' '}
+                  {selected.program_date
+                    ? new Date(selected.program_date).toLocaleDateString()
+                    : 'an unrecorded date'}
+                </p>
+              </div>
+              <button
+                onClick={() => setSelected(null)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="rounded-lg border border-slate-200 p-3">
+                <p className="text-xl font-semibold text-slate-900">{selected.total_clients}</p>
+                <p className="text-xs font-medium text-slate-500">Clients trained</p>
+              </div>
+              <div className="rounded-lg border border-slate-200 p-3">
+                <p className="text-xl font-semibold text-slate-900">
+                  GHS {Number(selected.total_amount).toLocaleString()}
+                </p>
+                <p className="text-xs font-medium text-slate-500">Total collected</p>
+              </div>
+              <div className="rounded-lg border border-slate-200 p-3">
+                <p className="text-xl font-semibold text-slate-900">
+                  GHS{' '}
+                  {selected.total_clients > 0
+                    ? Math.round(Number(selected.total_amount) / selected.total_clients).toLocaleString()
+                    : 0}
+                </p>
+                <p className="text-xs font-medium text-slate-500">Avg. per client</p>
+              </div>
+              <div className="rounded-lg border border-slate-200 p-3">
+                <p className="text-xl font-semibold text-slate-900">
+                  {new Date(selected.archived_at).toLocaleDateString()}
+                </p>
+                <p className="text-xs font-medium text-slate-500">Archived on</p>
+              </div>
+            </div>
+
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-sm font-medium text-slate-700">Client details</p>
+              {selectedClients.length > 0 && (
+                <button
+                  onClick={handleDownloadSelectedClients}
+                  className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                >
+                  <Download size={13} />
+                  Download CSV
+                </button>
+              )}
+            </div>
+
+            {selectedLoading ? (
+              <p className="text-sm text-slate-500">Loading…</p>
+            ) : selectedClients.length === 0 ? (
+              <p className="text-sm text-slate-500">No client records were saved for this program.</p>
+            ) : (
+              <div className="overflow-hidden rounded-lg border border-slate-200">
+                <div className="max-h-72 overflow-y-auto">
+                  <table className="w-full min-w-[520px] text-sm">
+                    <thead className="sticky top-0 bg-slate-50">
+                      <tr className="text-left text-slate-500">
+                        <th className="px-4 py-2 font-medium">Client</th>
+                        <th className="px-4 py-2 font-medium">Contact</th>
+                        <th className="px-4 py-2 font-medium">Ticket</th>
+                        <th className="px-4 py-2 font-medium">Paid</th>
+                        <th className="px-4 py-2 font-medium">Pending</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedClients.map((c) => (
+                        <tr key={c.id} className="border-t border-slate-100">
+                          <td className="px-4 py-2 font-medium text-slate-800">{c.client_name || '—'}</td>
+                          <td className="px-4 py-2 text-slate-600">
+                            {c.phone || c.email || '—'}
+                          </td>
+                          <td className="px-4 py-2 text-slate-600">{c.ticket_number || '—'}</td>
+                          <td className="px-4 py-2 text-slate-600">GHS {Number(c.paid_amount).toLocaleString()}</td>
+                          <td className="px-4 py-2 text-slate-600">GHS {Number(c.pending_amount).toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

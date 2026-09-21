@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Users, HandCoins, Clock3, PlusCircle } from 'lucide-react'
+import { Users, HandCoins, Clock3, AlertTriangle, PlusCircle } from 'lucide-react'
 import Topbar from '../components/Topbar'
 import StatCard from '../components/StatCard'
 import OverduePayments from '../components/OverduePayments'
@@ -40,7 +40,7 @@ export default function Dashboard() {
     load()
   }, [])
 
-  const { totalCollected, totalClients, pendingTotal, overdueTotal, overdueList, chartData } = useMemo(() => {
+  const { totalCollected, totalClients, overdueClients, pendingTotal, overdueTotal, overdueList, chartData } = useMemo(() => {
     const now = new Date()
 
     // All-time total collected across every client and program — not
@@ -49,8 +49,6 @@ export default function Dashboard() {
     const totalCollected = payments
       .filter((p) => p.status === 'paid')
       .reduce((sum, p) => sum + Number(p.amount), 0)
-
-    const totalClients = clients.length
 
     const priceByProgram = new Map(programs.map((p) => [p.id, Number(p.price)]))
     const dateByProgram = new Map(programs.map((p) => [p.id, p.date ? new Date(p.date) : null]))
@@ -91,6 +89,7 @@ export default function Dashboard() {
         overdueTotal += remaining
         overdueList.push({
           id: key,
+          clientId,
           clientName: nameByClient.get(clientId) ?? 'Unknown client',
           amount: remaining,
           currency: 'GHS',
@@ -115,6 +114,7 @@ export default function Dashboard() {
         overdueTotal += Number(p.amount)
         overdueList.push({
           id: `manual-${p.client_id}-${p.due_date}`,
+          clientId: p.client_id,
           clientName: nameByClient.get(p.client_id) ?? 'Unknown client',
           amount: Number(p.amount),
           currency: 'GHS',
@@ -124,6 +124,12 @@ export default function Dashboard() {
       })
 
     overdueList.sort((a, b) => a.sortDate - b.sortDate)
+
+    // A client with any overdue balance is pulled out of "Total clients"
+    // and counted separately, rather than blending into the general total.
+    const overdueClientIds = new Set(overdueList.map((o) => o.clientId))
+    const overdueClients = overdueClientIds.size
+    const totalClients = clients.length - overdueClients
 
     // Group by calendar day so multiple payments on the same day become one
     // point, not one point each — the cumulative total still stays correct.
@@ -149,7 +155,7 @@ export default function Dashboard() {
     })
     const chartData = allDailyPoints.slice(-8)
 
-    return { totalCollected, totalClients, pendingTotal, overdueTotal, overdueList, chartData }
+    return { totalCollected, totalClients, overdueClients, pendingTotal, overdueTotal, overdueList, chartData }
   }, [payments, programs, clients])
 
   const user = admin && {
@@ -167,8 +173,13 @@ export default function Dashboard() {
       />
 
       <div className="p-4 sm:p-8">
-        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           <StatCard icon={Users} label="Total clients" value={totalClients.toLocaleString()} />
+          <StatCard
+            icon={AlertTriangle}
+            label="Overdue clients"
+            value={overdueClients.toLocaleString()}
+          />
           <StatCard
             icon={HandCoins}
             label="Payment collected"

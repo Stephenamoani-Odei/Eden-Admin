@@ -13,10 +13,7 @@ import AuditLog from './pages/AuditLog'
 import Settings from './pages/Settings'
 import History from './pages/History'
 
-// Flip this to true whenever you're making changes to the admin dashboard
-// and don't want anyone — including yourself — getting in while you work.
-// Flip it back to false when you're done. No login, no database, nothing
-// else to touch: just this one value, then redeploy.
+
 const SYSTEM_UPDATE_IN_PROGRESS = false
 
 function AppLayout({ children }) {

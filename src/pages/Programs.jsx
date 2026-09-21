@@ -60,10 +60,10 @@ export default function Programs() {
   }
 
   async function toggleActive(program) {
-    // Marking a program done now archives it immediately — its name, date,
-    // client count, and total collected move to History, and its client +
-    // payment records are removed. That's irreversible, so it goes through
-    // a confirmation step instead of a plain toggle.
+    // Marking a program done archives it immediately — its name, date, and
+    // client-level details (name, contact, paid/pending) all move to
+    // History, and it disappears from this active list. Nothing is
+    // permanently deleted anymore; it just becomes read-only there.
     if (program.is_active) {
       setPendingMarkDone(program)
       return
@@ -325,18 +325,36 @@ export default function Programs() {
         onCancel={() => setPendingDelete(null)}
       />
 
-      <ConfirmDialog
-        open={!!pendingMarkDone}
-        title="Mark this program as done?"
-        message={
-          pendingMarkDone
-            ? `"${pendingMarkDone.name}" will move to History right now — its name, date, client count, and total collected are kept there permanently. Its client details and payment records will be deleted. This can't be undone.`
-            : ''
-        }
-        confirmLabel={markingDone ? 'Archiving…' : 'Mark as done'}
-        onConfirm={confirmMarkDone}
-        onCancel={() => setPendingMarkDone(null)}
-      />
+      {pendingMarkDone && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-lg">
+            <h2 className="mb-2 text-lg font-semibold text-slate-900">
+              Mark "{pendingMarkDone.name}" as done?
+            </h2>
+            <p className="mb-5 text-sm text-slate-600">
+              This moves the program to History right now — its clients, their contact details,
+              and what each one paid all move with it. Nothing is deleted; you can still view and
+              download it from History afterward.
+            </p>
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setPendingMarkDone(null)}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmMarkDone}
+                disabled={markingDone}
+                className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+              >
+                {markingDone ? 'Archiving…' : 'Mark as done'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
