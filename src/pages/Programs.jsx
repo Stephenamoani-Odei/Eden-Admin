@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, Pencil } from 'lucide-react'
 import PageHeader from '../components/PageHeader'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/ToastContext'
+
+const BLANK_FORM = { name: '', description: '', price: '', duration: '', location: '', date: '' }
 
 export default function Programs() {
   const { admin } = useAuth()
@@ -12,7 +14,8 @@ export default function Programs() {
   const [programs, setPrograms] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ name: '', description: '', price: '', duration: '', location: '', date: '' })
+  const [editingId, setEditingId] = useState(null)
+  const [form, setForm] = useState(BLANK_FORM)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [pendingDelete, setPendingDelete] = useState(null)
@@ -33,43 +36,70 @@ export default function Programs() {
     loadPrograms()
   }, [])
 
+  function openAddForm() {
+    setForm(BLANK_FORM)
+    setEditingId(null)
+    setError('')
+    setShowForm(true)
+  }
+
+  function closeForm() {
+    setShowForm(false)
+    setEditingId(null)
+    setError('')
+  }
+
+  function startEdit(program) {
+    setForm({
+      name: program.name || '',
+      description: program.description || '',
+      price: program.price != null ? String(program.price) : '',
+      duration: program.duration || '',
+      location: program.location || '',
+      // program.date comes back as 'YYYY-MM-DD' already, which is what
+      // <input type="date"> expects.
+      date: program.date || '',
+    })
+    setEditingId(program.id)
+    setError('')
+    setShowForm(true)
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
     setSaving(true)
     setError('')
 
-    const { error } = await supabase.from('programs').insert({
+    const payload = {
       name: form.name,
       description: form.description || null,
       price: Number(form.price) || 0,
       duration: form.duration || null,
       location: form.location || null,
       date: form.date || null,
-      created_by: admin?.id,
-    })
+    }
+
+    const { error } = editingId
+      ? await supabase.from('programs').update(payload).eq('id', editingId)
+      : await supabase.from('programs').insert({ ...payload, created_by: admin?.id })
 
     setSaving(false)
     if (error) {
       setError(error.message)
       return
     }
-    setForm({ name: '', description: '', price: '', duration: '', location: '', date: '' })
-    setShowForm(false)
-    showToast('Program added.')
+    const wasEditing = !!editingId
+    closeForm()
+    setForm(BLANK_FORM)
+    showToast(wasEditing ? 'Program updated.' : 'Program added.')
     loadPrograms()
   }
 
   async function toggleActive(program) {
-    // Marking a program done archives it immediately — its name, date, and
-    // client-level details (name, contact, paid/pending) all move to
-    // History, and it disappears from this active list. Nothing is
-    // permanently deleted anymore; it just becomes read-only there.
     if (program.is_active) {
       setPendingMarkDone(program)
       return
     }
-    // Re-activating an already-inactive program (rare — only reachable if
-    // toggled off without archiving elsewhere) stays a simple flag flip.
     setPrograms((prev) =>
       prev.map((p) => (p.id === program.id ? { ...p, is_active: true } : p))
     )
@@ -103,9 +133,6 @@ export default function Programs() {
     setPendingDelete(null)
     setPrograms((prev) => prev.filter((p) => p.id !== program.id))
 
-    // Uses the same RPC as the Reports page: it removes the program record
-    // AND its payment history together, and runs as SECURITY DEFINER so it
-    // isn't silently blocked by RLS the way a plain delete could be.
     const { error } = await supabase.rpc('admin_delete_program_and_payments', {
       p_program_id: program.id,
     })
@@ -124,7 +151,7 @@ export default function Programs() {
         subtitle="Courses and programs EdenPlus offers"
         action={
           <button
-            onClick={() => setShowForm((v) => !v)}
+            onClick={() => (showForm ? closeForm() : openAddForm())}
             className="flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
           >
             <Plus size={16} /> Add a program
@@ -138,6 +165,10 @@ export default function Programs() {
             onSubmit={handleSubmit}
             className="mb-6 grid grid-cols-1 gap-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:grid-cols-2"
           >
+            <h2 className="col-span-full text-sm font-semibold text-slate-800">
+              {editingId ? 'Edit program' : 'New program'}
+            </h2>
+
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Program name</label>
               <input
@@ -171,10 +202,16 @@ export default function Programs() {
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Description</label>
+              <div className="mb-1 flex items-baseline justify-between">
+                <label className="block text-sm font-medium text-slate-700">Description</label>
+                <span className={`text-xs ${form.description.length > 200 ? 'text-danger-600' : 'text-slate-400'}`}>
+                  {form.description.length}/200
+                </span>
+              </div>
               <input
                 value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                onChange={(e) => setForm({ ...form, description: e.target.value.slice(0, 200) })}
+                maxLength={200}
                 placeholder="Optional"
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
               />
@@ -206,11 +243,11 @@ export default function Programs() {
                 disabled={saving}
                 className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60"
               >
-                {saving ? 'Saving…' : 'Save program'}
+                {saving ? 'Saving…' : editingId ? 'Save changes' : 'Save program'}
               </button>
               <button
                 type="button"
-                onClick={() => setShowForm(false)}
+                onClick={closeForm}
                 className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
               >
                 Cancel
@@ -250,6 +287,13 @@ export default function Programs() {
                         {[p.duration, p.location].filter(Boolean).join(' · ') || '—'}
                       </p>
                     </div>
+                    <button
+                      onClick={() => startEdit(p)}
+                      aria-label={`Edit ${p.name}`}
+                      className="shrink-0 rounded-lg p-1.5 text-slate-400 hover:bg-brand-50 hover:text-brand-600"
+                    >
+                      <Pencil size={16} />
+                    </button>
                     <button
                       onClick={() => setPendingDelete(p)}
                       aria-label={`Delete ${p.name}`}
@@ -294,14 +338,23 @@ export default function Programs() {
                         </td>
                         <td className="px-6 py-3 text-slate-500">{p.duration || '—'}</td>
                         <td className="px-6 py-3 text-slate-500">{p.location || '—'}</td>
-                        <td className="px-6 py-3 text-right">
-                          <button
-                            onClick={() => setPendingDelete(p)}
-                            aria-label={`Delete ${p.name}`}
-                            className="rounded-lg p-1.5 text-slate-400 hover:bg-danger-50 hover:text-danger-600"
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                        <td className="px-6 py-3">
+                          <div className="flex justify-end gap-1">
+                            <button
+                              onClick={() => startEdit(p)}
+                              aria-label={`Edit ${p.name}`}
+                              className="rounded-lg p-1.5 text-slate-400 hover:bg-brand-50 hover:text-brand-600"
+                            >
+                              <Pencil size={16} />
+                            </button>
+                            <button
+                              onClick={() => setPendingDelete(p)}
+                              aria-label={`Delete ${p.name}`}
+                              className="rounded-lg p-1.5 text-slate-400 hover:bg-danger-50 hover:text-danger-600"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}

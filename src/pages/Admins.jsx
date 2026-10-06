@@ -135,7 +135,7 @@ export default function Admins() {
 
             {error && <p className="col-span-full text-sm text-danger-600">{error}</p>}
 
-            <div className="col-span-full flex gap-2">
+            <div className="col-span-full flex flex-col gap-2 sm:flex-row">
               <button
                 type="submit"
                 disabled={saving}
@@ -154,42 +154,69 @@ export default function Admins() {
           </form>
         )}
 
-        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
           {loading ? (
             <p className="p-6 text-sm text-slate-500">Loading…</p>
           ) : (
-            <table className="w-full min-w-[480px] text-sm">
-              <thead>
-                <tr className="border-b border-slate-100 text-left text-slate-500">
-                  <th className="px-6 py-3 font-medium">Name</th>
-                  <th className="px-6 py-3 font-medium">Username</th>
-                  <th className="px-6 py-3 font-medium">Role</th>
-                  {isSuperAdmin && <th className="px-6 py-3 font-medium"></th>}
-                </tr>
-              </thead>
-              <tbody>
+            <>
+              {/* Mobile: stacked cards, no horizontal scrolling */}
+              <div className="divide-y divide-slate-50 sm:hidden">
                 {admins.map((a) => (
-                  <tr key={a.id} className="border-b border-slate-50 last:border-0">
-                    <td className="px-6 py-3 text-slate-800">{a.name}</td>
-                    <td className="px-6 py-3 text-slate-500">{a.username}</td>
-                    <td className="px-6 py-3 capitalize text-slate-800">{a.role.replace('_', ' ')}</td>
-                    {isSuperAdmin && (
-                      <td className="px-6 py-3 text-right">
-                        {a.id !== currentAdmin?.id && (
-                          <button
-                            onClick={() => setPendingDelete(a)}
-                            aria-label={`Remove ${a.name}`}
-                            className="rounded-lg p-1.5 text-slate-400 hover:bg-danger-50 hover:text-danger-600"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        )}
-                      </td>
+                  <div key={a.id} className="flex items-start justify-between gap-2 p-4">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-slate-800">{a.name}</p>
+                      <p className="truncate text-xs text-slate-500">{a.username}</p>
+                      <p className="mt-1 text-xs capitalize text-slate-600">{a.role.replace('_', ' ')}</p>
+                    </div>
+                    {isSuperAdmin && a.id !== currentAdmin?.id && (
+                      <button
+                        onClick={() => setPendingDelete(a)}
+                        aria-label={`Remove ${a.name}`}
+                        className="shrink-0 rounded-lg p-1.5 text-slate-400 hover:bg-danger-50 hover:text-danger-600"
+                      >
+                        <Trash2 size={16} />
+                      </button>
                     )}
-                  </tr>
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+
+              {/* Desktop / tablet: table, horizontal scroll scoped to just the table */}
+              <div className="hidden overflow-x-auto sm:block">
+                <table className="w-full min-w-[480px] text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100 text-left text-slate-500">
+                      <th className="px-6 py-3 font-medium">Name</th>
+                      <th className="px-6 py-3 font-medium">Username</th>
+                      <th className="px-6 py-3 font-medium">Role</th>
+                      {isSuperAdmin && <th className="px-6 py-3 font-medium"></th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {admins.map((a) => (
+                      <tr key={a.id} className="border-b border-slate-50 last:border-0">
+                        <td className="px-6 py-3 text-slate-800">{a.name}</td>
+                        <td className="px-6 py-3 text-slate-500">{a.username}</td>
+                        <td className="px-6 py-3 capitalize text-slate-800">{a.role.replace('_', ' ')}</td>
+                        {isSuperAdmin && (
+                          <td className="px-6 py-3 text-right">
+                            {a.id !== currentAdmin?.id && (
+                              <button
+                                onClick={() => setPendingDelete(a)}
+                                aria-label={`Remove ${a.name}`}
+                                className="rounded-lg p-1.5 text-slate-400 hover:bg-danger-50 hover:text-danger-600"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            )}
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
       </div>

@@ -127,7 +127,38 @@ export default function History() {
           </div>
         ) : (
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div className="overflow-x-auto">
+            {/* Mobile: stacked cards, no horizontal scrolling */}
+            <div className="divide-y divide-slate-50 sm:hidden">
+              {records.map((r) => (
+                <div
+                  key={r.id}
+                  onClick={() => setSelected(r)}
+                  className="cursor-pointer p-4 hover:bg-slate-50"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="truncate font-medium text-slate-800">{r.program_name}</p>
+                    <p className="shrink-0 text-xs text-slate-500">
+                      {r.program_date ? new Date(r.program_date).toLocaleDateString() : '—'}
+                    </p>
+                  </div>
+                  <dl className="mt-2 grid grid-cols-2 gap-y-1 text-xs">
+                    <dt className="text-slate-500">Clients</dt>
+                    <dd className="text-right text-slate-700">{r.total_clients}</dd>
+                    <dt className="text-slate-500">Total collected</dt>
+                    <dd className="text-right text-slate-700">
+                      GHS {Number(r.total_amount).toLocaleString()}
+                    </dd>
+                    <dt className="text-slate-500">Archived on</dt>
+                    <dd className="text-right text-slate-700">
+                      {new Date(r.archived_at).toLocaleDateString()}
+                    </dd>
+                  </dl>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop / tablet: table, horizontal scroll scoped to just the table */}
+            <div className="hidden overflow-x-auto sm:block">
               <table className="w-full min-w-[640px] text-sm">
                 <thead>
                   <tr className="border-b border-slate-100 text-left text-slate-500">
@@ -192,7 +223,7 @@ export default function History() {
               </button>
             </div>
 
-            <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="mb-5 grid grid-cols-2 gap-3">
               <div className="rounded-lg border border-slate-200 p-3">
                 <p className="text-xl font-semibold text-slate-900">{selected.total_clients}</p>
                 <p className="text-xs font-medium text-slate-500">Clients trained</p>
